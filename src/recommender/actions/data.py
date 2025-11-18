@@ -1,3 +1,4 @@
+from typing import Dict
 from recommender.utils.data_processing import (
     load_training_data,
     escape_newlines_in_strings,
@@ -7,15 +8,13 @@ from recommender.utils.data_config import (
     determine_input_and_response_text,
     fetch_chat_template,
 )
-from typing import Dict
 from .actions import Action, IR, PatchLevel, PatchType, Comment
 
 
 class ApplyDataFormat(Action):
-    def _is_data_in_required_format(self, dataset_path: str) -> bool:
-        raise NotImplementedError(
-            "Data format validation should be implemented by child data based action class."
-        )
+    def heuristic_skip(self, ir):
+        path = ir.train_config.get("training_data_path")
+        return not path
 
     def _is_data_tokenized(self, path):
         data = load_training_data(path)
@@ -24,93 +23,44 @@ class ApplyDataFormat(Action):
         if not isinstance(data[0], dict):
             return False
         tokenized_fields = {"input_ids", "labels", "attention_mask"}
-        return any(field in data[0] for field in tokenized_fields)
-
-    def heuristic_skip(self, ir):
-        if ir.train_config.get("training_data_path", None) or ir.data_preprocessor.get(
-            "datasets", None
-        ):
-            if ir.data_preprocessor.get("datasets", None):
-                for dataset in ir.data_preprocessor["datasets"]:
-                    if not len(dataset.get("data_paths", [])):
-                        # TODO: instead of skipping
-                        # we should return IR with type USER_INTERVENTION
-                        return True
-                    for path in dataset.get("data_paths"):
-                        if self._is_data_in_required_format(
-                            path
-                        ) and not self._is_data_tokenized(path):
-                            # NOTE: we check for one path to be in format
-                            # while all paths are checked in action.apply
-                            # implementation
-                            return False
-                        return True
-            if ir.train_config.get("training_data_path", None):
-                return not self._is_data_in_required_format(
-                    ir.train_config.get("training_data_path", None)
-                )
-        return True
-
-    def _are_all_datapaths_in_format(self, data_paths):
-        return not any(
-            [not self._is_data_in_required_format(path) for path in data_paths]
-        )
+        return any(f in data[0] for f in tokenized_fields)
 
 
 class ApplyQAFormat(ApplyDataFormat):
 
-    def _is_data_in_required_format(self, dataset_path: str) -> bool:
-        data = load_training_data(dataset_path)
-        if isinstance(data, list) and len(data) > 0:
-            data = data[0]
-        COMMON_INPUT_KEYS = [
-            "input",
-            "instruction",
-            "prompt",
-            "question",
-            "tweet_text",
-            "query",
-            "source",
-            "tweet text",
-        ]
-        COMMON_RESPONSE_KEYS = [
-            "output",
-            "response",
-            "answer",
-            "label",
-            "text_label",
-            "target",
-            "completion",
-        ]
+    COMMON_INPUT_KEYS = [
+        "input", "instruction", "prompt", "question",
+        "tweet_text", "query", "source", "tweet text",
+    ]
+    COMMON_RESPONSE_KEYS = [
+        "output", "response", "answer", "label",
+        "text_label", "target", "completion",
+    ]
 
-        if has_any_key_containing(data, COMMON_INPUT_KEYS) and has_any_key_containing(
-            data, COMMON_RESPONSE_KEYS
-        ):
-            return True
-        return False
+    def _is_data_in_required_format(self, path: str) -> bool:
+        try:
+            data = load_training_data(path)
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+        except:
+            return False
+        return (
+            has_any_key_containing(data, self.COMMON_INPUT_KEYS)
+            and has_any_key_containing(data, self.COMMON_RESPONSE_KEYS)
+        )
 
-    def _is_dataset_in_required_format(self, dataset: Dict) -> bool:
-        # TODO: This can turn out to be an time-intensive operation
-        # we should think if we want to do this.
-        # ideally should iterate over each datapath using _is_data_in_required_format
-        return True
+    def _get_values_for_path(self, path: str):
+        input_txt, response_txt = determine_input_and_response_text(path)
 
-    def _get_values_for_given_datapath(self, dataset_path: str):
-        # TODO: Actions should made aware of the existing user changes
-        # right now they work in replace-everything-first approach
-        jinja_template = "### Input: {{}} \\\n\\\n### Response: {{}}"
-        input_text, response_text = determine_input_and_response_text(dataset_path)
-        template = jinja_template.format(input_text, response_text)
-        formatted_text_column_name = "formatted_qa_data"
-        dataset_text_field = "formatted_qa_data"
-        response_template = "\\\n### Response:"
+        template = (
+            "### Input: {{%s}} \n\n### Response: {{%s}}"
+            % (input_txt, response_txt)
+        )
+
         return {
+            "dataset_text_field": "formatted_qa_data",
+            "response_template": "### Response:",
             "template": template,
-            "input_text": input_text,
-            "response_text": response_text,
-            "formatted_text_column_name": formatted_text_column_name,
-            "dataset_text_field": dataset_text_field,
-            "response_template": response_template,
             "data_handlers": [
                 {
                     "name": "apply_custom_jinja_template",
@@ -118,7 +68,7 @@ class ApplyQAFormat(ApplyDataFormat):
                         "remove_columns": "all",
                         "batched": False,
                         "fn_kwargs": {
-                            "formatted_text_column_name": formatted_text_column_name,
+                            "formatted_text_column_name": "formatted_qa_data",
                             "template": template,
                         },
                     },
@@ -126,42 +76,42 @@ class ApplyQAFormat(ApplyDataFormat):
             ],
         }
 
-    def _get_values_for_given_dataset(self, dataset: Dict):
-        return self._get_values_for_given_datapath(dataset.get("data_paths")[0])
-
     def apply(self, ir: IR) -> IR:
-        if self.heuristic_skip(ir) or self.skip:
+        if self.skip or self.heuristic_skip(ir):
             self.skip = True
             return
 
-        # TODO: Actions should made aware of the existing user changes
-        # right now they work in replace-everything-first approach
+        path = ir.train_config["training_data_path"]
 
-        if ir.train_config.get("training_data_path", None):
-            ir.data_preprocessor["dataprocessor"] = {
-                "type": "default",
-                "streaming": False,
+        ir.data_preprocessor["dataprocessor"] = {
+            "type": "default",
+            "streaming": False,
+        }
+        ir.data_preprocessor["datasets"] = [
+            {
+                "name": "dataset_from_inputs",
+                "data_paths": [path],
+                "data_handlers": {},
             }
-            ir.data_preprocessor["datasets"] = [
-                {
-                    "name": f"dataset_from_inputs",
-                    "data_paths": [ir.train_config.get("training_data_path")],
-                    "data_handlers": {},
-                }
-            ]
+        ]
 
-        for dataset in ir.data_preprocessor["datasets"]:
-            values_to_set = self._get_values_for_given_dataset(dataset)
-            ir.train_config = ir.train_config.update(
-                {
-                    "dataset_text_field": values_to_set["dataset_text_field"],
-                    "response_template": values_to_set["response_template"],
-                }
-            )
-            dataset["data_handlers"] = values_to_set["data_handlers"]
-        ir.comment = Comment(
-            "This data config is used for formatting QA datasets for training"
-        )
+        dataset = ir.data_preprocessor["datasets"][0]
+        vals = self._get_values_for_path(path)
+
+        dataset["data_handlers"] = vals["data_handlers"]
+        dataset["dataset_text_field"] = vals["dataset_text_field"]
+        dataset["response_template"] = vals["response_template"]
+        dataset["template"] = vals["template"]
+
+        try:
+            sample = load_training_data(path)[0]
+            keys = {k.lower() for k in sample}
+            if "text" in keys and "label" in keys:
+                dataset["column_mapping"] = {"input": "text", "target": "label"}
+        except:
+            pass
+
+        ir.comment = Comment("This data config is used for formatting QA datasets.")
         ir.type = PatchType.COMPATIBILITY
         ir.level = PatchLevel.MANDATORY
         self.json_merge_patches.append(ir)
@@ -170,97 +120,94 @@ class ApplyQAFormat(ApplyDataFormat):
 
 
 class ApplyChatFormat(ApplyDataFormat):
-    CHAT_STYLE_KEYS = ["messages", "conversations", "dialogues", "chat", "turns"]
+    CHAT_KEYS = ["messages", "conversations", "dialogues", "chat", "turns"]
 
-    def _is_data_in_required_format(self, dataset_path: str) -> bool:
-        data = load_training_data(dataset_path)
-        if isinstance(data, list) and len(data) > 0:
-            data = data[0]
-        if has_any_key_containing(data, self.CHAT_STYLE_KEYS):
-            for chat_key in self.CHAT_STYLE_KEYS:
-                if chat_key in data:
-                    val = data[chat_key]
-                    if isinstance(val, list):
-                        if all(
-                            isinstance(m, dict) and "role" in m and "content" in m
-                            for m in val
-                        ):
-                            return True
+    def _is_data_in_required_format(self, path: str) -> bool:
+        try:
+            data = load_training_data(path)
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+        except:
+            return False
+
+        for k in self.CHAT_KEYS:
+            if k in data and isinstance(data[k], list):
+                if all(isinstance(m, dict) and "role" in m and "content" in m for m in data[k]):
+                    return True
+
         return False
 
-    def _is_dataset_in_required_format(self, dataset: Dict) -> bool:
-        # TODO: This can turn out to be an time-intensive operation
-        # we should think if we want to do this.
-        # ideally should iterate over each datapath using _is_data_in_required_format
-        return True
-
-    def _get_values_for_given_datapath(
-        self, dataset_path: str, model_name_or_path: str, max_seq_length: int
-    ):
-        # TODO: Actions should made aware of the existing user changes
-        # right now they work in replace-everything-first approach
-
-        # TODO: add more checks for specials tokens present or not
-        chat_template, special_tokens = fetch_chat_template(model_name_or_path)
+    def _get_values_for_path(self, path: str, model: str, max_len: int):
+        chat_template, _ = fetch_chat_template(model)
         if chat_template:
             chat_template = escape_newlines_in_strings(chat_template)
-            chat_template = "{% raw %}\n  " + chat_template + "\n  {% endraw %}"
-        data = load_training_data(dataset_path)
-        for chat_key in self.CHAT_STYLE_KEYS:
-            if chat_key in data:
-                conversation_column_name = chat_key
+            chat_template = "{% raw %}\n" + chat_template + "\n{% endraw %}"
+
+        data = load_training_data(path)
+        conv_col = None
+        for k in self.CHAT_KEYS:
+            if k in data:
+                conv_col = k
                 break
+
+        if conv_col is None:
+            return None
 
         return {
             "chat_template": chat_template,
-            "conversation_column_name": conversation_column_name,
+            "conversation_column_name": conv_col,
             "data_handlers": [
                 {
                     "name": "tokenize_and_apply_chat_template_with_masking",
                     "arguments": {
                         "remove_columns": "all",
                         "fn_kwargs": {
-                            "max_seq_length": max_seq_length,
-                            "conversation_column_name": conversation_column_name,
+                            "max_seq_length": max_len,
+                            "conversation_column_name": conv_col,
                         },
                     },
                 }
             ],
         }
 
-    def _get_values_for_given_dataset(self, dataset: Dict):
-        return self._get_values_for_given_datapath(dataset.get("data_paths")[0])
-
     def apply(self, ir: IR) -> IR:
-        if self.heuristic_skip(ir) or self.skip:
+        if self.skip or self.heuristic_skip(ir):
             self.skip = True
             return
 
-        # TODO: Actions should made aware of the existing user changes
-        # right now they work in replace-everything-first approach
+        path = ir.train_config["training_data_path"]
 
-        if ir.train_config.get("training_data_path", None):
-            ir.data_preprocessor["dataprocessor"] = {
-                "type": "default",
-                "streaming": False,
+        if not self._is_data_in_required_format(path):
+            self.skip = True
+            return
+
+        ir.data_preprocessor["dataprocessor"] = {
+            "type": "default",
+            "streaming": False,
+        }
+        ir.data_preprocessor["datasets"] = [
+            {
+                "name": "dataset_from_inputs",
+                "data_paths": [path],
+                "data_handlers": {},
             }
-            ir.data_preprocessor["datasets"] = [
-                {
-                    "name": f"dataset_from_inputs",
-                    "data_paths": [ir.train_config.get("training_data_path")],
-                    "data_handlers": {},
-                }
-            ]
-        for dataset in ir.data_preprocessor["datasets"]:
-            values_to_set = self._get_values_for_given_dataset(dataset)
-            dataset["data_handlers"] = values_to_set["data_handlers"]
-            # TODO: all datasets can only use one chat template
-            # so we should check if we find a different chat template
-            # return it as user_intervention
-            ir.data_preprocessor["chat_template"] = values_to_set["chat_template"]
-        ir.comment = Comment(
-            "This data config is used for formatting chat datasets for training"
+        ]
+
+        vals = self._get_values_for_path(
+            path,
+            ir.train_config["model_name_or_path"],
+            ir.train_config.get("max_seq_length", 2048),
         )
+
+        if vals is None:
+            self.skip = True
+            return
+
+        dataset = ir.data_preprocessor["datasets"][0]
+        dataset["data_handlers"] = vals["data_handlers"]
+        ir.data_preprocessor["chat_template"] = vals["chat_template"]
+
+        ir.comment = Comment("This data config is used for formatting chat datasets.")
         ir.type = PatchType.COMPATIBILITY
         ir.level = PatchLevel.MANDATORY
         self.json_merge_patches.append(ir)
