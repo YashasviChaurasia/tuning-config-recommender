@@ -6,6 +6,15 @@ from typing import Any, Dict, List
 
 DYNAMIC_PATTERN = re.compile(r"^\$\{([A-Za-z0-9_]+)\}$")
 
+def extract_runtime_fields(data_preprocessor: dict):
+    runtime = {}
+
+    for key in ["_dataset_text_field", "_response_template", "_conversation_column_name"]:
+        if key in data_preprocessor:
+            runtime[key.lstrip("_")] = data_preprocessor[key]
+            data_preprocessor.pop(key)
+
+    return runtime
 
 def safe_serialize(obj):
     if isinstance(obj, (str, int, float, bool)) or obj is None:
@@ -17,22 +26,18 @@ def safe_serialize(obj):
     return str(obj)
 
 
-def write_yaml_preserving_templates(obj: Any, path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    def fix(o):
+def write_yaml_preserving_templates(obj, path):
+    def strip_private(o):
         if isinstance(o, dict):
-            return {
-                k: json.dumps(v) if k == "template" and isinstance(v, str) else fix(v)
-                for k, v in o.items()
-            }
+            return {k: strip_private(v) for k, v in o.items() if not k.startswith("_")}
         if isinstance(o, list):
-            return [fix(x) for x in o]
+            return [strip_private(x) for x in o]
         return o
 
+    cleaned = strip_private(obj)
     with path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(
-            fix(safe_serialize(obj)),
+            cleaned,
             f,
             sort_keys=False,
             allow_unicode=True,
@@ -75,6 +80,7 @@ def build_launch_command(
     data_config: Path,
     accel_config: Path,
     dynamic_args: List[str] = None,
+    runtime_args: Dict[str, Any] = None,
 ) -> str:
 
     cmd = [
@@ -88,5 +94,10 @@ def build_launch_command(
         if v is not None and k != "training_data_path":
             cmd.append(f"--{k} {fmt_cli_value(v)}")
 
+    if runtime_args:
+        for k, v in runtime_args.items():
+            cmd.append(f"--{k} {fmt_cli_value(v)}")
+
     cmd.append(f"--data_config '{data_config}'")
+
     return " \\\n".join(cmd)

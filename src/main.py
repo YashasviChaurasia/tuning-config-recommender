@@ -23,10 +23,17 @@ if __name__ == "__main__":
     result = fms_adapter.run(
         train_config={
             "model_name_or_path": "ibm-granite/granite-4.0-h-350m",
-            "training_data_path": "ought/raft",
+            "training_data_path": "tatsu-lab/alpaca",
             "tuning_strategy": "full",
         },
         unique_tag="gpq12df-fms",
     )
     print(result["launch_command"])
 
+# ought/raft
+# tatsu-lab/alpaca
+# ought/raft
+# databricks/databricks-dolly-15k
+# HuggingFaceH4/ultrachat_200k
+# mosaicml/instruct-v3
+# robinsmits/ChatAlpaca-20K

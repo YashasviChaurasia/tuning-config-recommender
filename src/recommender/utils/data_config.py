@@ -84,49 +84,90 @@ def fetch_chat_template(model_name_or_path: str):
     return chat_template, additional_special_tokens
 
 
-def determine_input_and_response_text(training_data_path: str) -> dict:
-    """Determine the input and response field for the data formating template (Q/A format dataset)"""
+# def determine_input_and_response_text(training_data_path: str) -> dict:
+#     """Determine the input and response field for the data formating template (Q/A format dataset)"""
+#     data = load_training_data(training_data_path)
+#     data_item = data[0]
+#     columns = list(data_item.keys())
+#     columns = [k.lower() for k in columns]
+
+#     COMMON_INPUT_KEYS = [
+#         "tweet_text",
+#         "tweet text",
+#         "instruction",
+#         "prompt",
+#         "question",
+#         "input",
+#         "query",
+#         "source",
+#         "content",
+#     ]
+
+#     COMMON_RESPONSE_KEYS = [
+#         "text_label",
+#         "label",
+#         "response",
+#         "answer",
+#         "output",
+#         "target",
+#         "completion",
+#     ]
+
+#     input_col = "input"
+#     output_col = "output"
+
+#     for col in COMMON_INPUT_KEYS:
+#         if any(key in col.lower() for key in columns):
+#             input_col = col
+#             break
+
+#     for col in COMMON_RESPONSE_KEYS:
+#         if any(key in col.lower() for key in columns):
+#             output_col = col
+#             break
+
+#     return input_col, output_col
+def determine_input_and_response_text(training_data_path: str):
+    """
+    Detects input and output fields dynamically by inspecting dataset samples.
+    Works for Alpaca, QA datasets, instruction-tuning formats, etc.
+    """
+
     data = load_training_data(training_data_path)
-    data_item = data[0]
-    columns = list(data_item.keys())
-    columns = [k.lower() for k in columns]
+    sample = data[0]
 
-    COMMON_INPUT_KEYS = [
-        "tweet_text",
-        "tweet text",
-        "instruction",
-        "prompt",
-        "question",
-        "input",
-        "query",
-        "source",
-        "content",
-    ]
+    columns = [k.lower() for k in sample.keys()]
 
-    COMMON_RESPONSE_KEYS = [
-        "text_label",
-        "label",
-        "response",
-        "answer",
-        "output",
-        "target",
-        "completion",
-    ]
+    # 1. Alpaca format (most common)
+    if "instruction" in columns and "output" in columns:
+        if "input" in columns and sample.get("input", "") != "":
+            # full instruction + input → output
+            return "instruction", "output"
+        else:
+            # instruction → output
+            return "instruction", "output"
 
-    input_col = "input"
-    output_col = "output"
+    # 2. Generic QA: question → answer
+    if "question" in columns and "answer" in columns:
+        return "question", "answer"
 
-    for col in COMMON_INPUT_KEYS:
-        if any(key in col.lower() for key in columns):
-            input_col = col
-            break
+    # 3. Generic QA: input → output
+    if "input" in columns and "output" in columns:
+        return "input", "output"
 
-    for col in COMMON_RESPONSE_KEYS:
-        if any(key in col.lower() for key in columns):
-            output_col = col
-            break
+    # 4. Classification datasets: text → label
+    if "text" in columns and "label" in columns:
+        return "text", "label"
 
-    return input_col, output_col
+    # 5. Fallback: use the first two textual fields
+    text_fields = [k for k in columns if isinstance(sample.get(k, ""), str)]
+    if len(text_fields) >= 2:
+        return text_fields[0], text_fields[1]
+
+    # Final fallback
+    return "input", "output"
+
+
 
 
 def has_any_key_containing(example: dict, key_substrings: list[str]) -> bool:

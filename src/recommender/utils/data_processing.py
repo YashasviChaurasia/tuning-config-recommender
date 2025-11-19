@@ -6,116 +6,94 @@ import pandas as pd
 from loguru import logger
 from pathlib import Path
 import shutil
-from datasets import load_dataset
+from datasets import load_dataset, Dataset, DatasetDict
 from huggingface_hub import hf_hub_download
 
 
-def extract_data_from_general_file(file_path) -> dict:
-    """Data extraction function from json/jsonl/parquet/arrow files"""
-    ext = os.path.splitext(file_path)[-1].lower()
-
+def extract_data_from_general_file(path: str) -> list:
+    ext = os.path.splitext(path)[-1].lower()
     if ext == ".json":
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    elif ext == ".jsonl":
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = [json.loads(line) for line in f]
-    elif ext == ".csv":
-        with open(file_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            data = list(reader)
-    elif ext == ".parquet":
-        df = pd.read_parquet(file_path)
-        data = df.to_dict(orient="records")
-    elif ext == ".arrow":
+        return json.load(open(path, "r", encoding="utf-8"))
+    if ext == ".jsonl":
+        return [json.loads(l) for l in open(path, "r", encoding="utf-8")]
+    if ext == ".csv":
+        return list(csv.DictReader(open(path, "r", encoding="utf-8")))
+    if ext == ".parquet":
+        return pd.read_parquet(path).to_dict(orient="records")
+    if ext == ".arrow":
         try:
-            data = load_dataset("arrow", data_files=file_path)
+            ds = load_dataset("arrow", data_files=path)
+            key = next(iter(ds.keys()))
+            return [dict(x) for x in ds[key]]
         except Exception as e:
             logger.error(f"Failed to load Arrow file: {e}")
-    else:
-        logger.error("Unsupported file format")
-
-    return data
+            raise
+    raise ValueError(f"Unsupported file format: {ext}")
 
 
-def maybe_is_a_hf_dataset_id(training_data_path: str) -> bool:
-    return len(training_data_path.split("/")) == 2
+def load_training_data(path: str) -> list:
 
-
-def load_training_data(training_data_path: str) -> dict:
-    """Load and validate training data based on training_data_path."""
-    _dataset_cache = {}
-
-    # Check if path is a file
-    if os.path.isfile(training_data_path):
-        data = extract_data_from_general_file(training_data_path)
+    if os.path.isfile(path):
+        data = extract_data_from_general_file(path)
+        if not data:
+            raise ValueError(f"Local file '{path}' contains no data.")
         return data
 
-    # Check if path is a folder
-    elif os.path.isdir(training_data_path) or maybe_is_a_hf_dataset_id:
-        try:
-            dataset = load_dataset(training_data_path)
-            data = [dict(example) for example in dataset["train"]]
-            return data
-        except Exception as e:
-            raise ValueError(f"Error loading dataset from folder or hf id: {e}")
-    raise ValueError(
-        f"Failed to find a way to load the provided dataset path {training_data_path}"
-    )
+    if os.path.isdir(path):
+        raise ValueError(
+            f"Local folder '{path}' is not supported. "
+            f"Pass a file or HF dataset ID (org/name)."
+        )
 
-
-def load_model_file_from_hf(model_name_or_path: str, file_name: str) -> dict:
-    """Load contens of a specific file of a model. Supports both the local file system and HF hub."""
     try:
-        config_path = hf_hub_download(repo_id=model_name_or_path, filename=file_name)
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-
+        ds = load_dataset(path)
     except Exception as e:
+        raise ValueError(
+            f"Failed to load HF dataset '{path}': {e}\n"
+            f"Ensure ID is correct/public or specify a config (e.g. repo/config)."
+        )
+
+    if isinstance(ds, Dataset):
+        return [dict(x) for x in ds]
+    if isinstance(ds, DatasetDict):
+        split = "train" if "train" in ds else next(iter(ds.keys()), None)
+        if not split:
+            raise ValueError(f"Dataset '{path}' has no splits.")
+        return [dict(x) for x in ds[split]]
+    raise ValueError(f"Unrecognized dataset format for '{path}'.")
+
+
+def load_model_file_from_hf(repo_id: str, file_name: str) -> dict:
+    try:
+        config_path = hf_hub_download(repo_id=repo_id, filename=file_name)
+        return json.load(open(config_path, "r", encoding="utf-8"))
+    except Exception:
         return {}
 
-    return config
+
+def escape_newlines_in_strings(s: str) -> str:
+    pattern = r"""(['"])(.*?)(?<!\\)\1"""
+
+    def repl(m):
+        q, content = m.group(1), m.group(2)
+        return f"{q}{content.replace('\n', '\\n')}{q}"
+
+    return re.sub(pattern, repl, s, flags=re.DOTALL)
 
 
-def escape_newlines_in_strings(template_str: str) -> str:
-    """Replace newlines in strings with \\n to aid in correctly rendering jinga template"""
-    # This regex matches single or double quoted strings, non-greedy
-    pattern = (
-        r"""(['"])(.*?)(?<!\\)\1"""  # match quotes, content, and closing same quote
-    )
+def get_model_path(model: str, unique_tag: str) -> str:
+    model_path = Path(model)
 
-    def replace_newlines(match):
-        quote = match.group(1)
-        content = match.group(2)
-        # Replace real newlines with literal \n inside the string content
-        content_escaped = content.replace("\n", "\\n")
-        return f"{quote}{content_escaped}{quote}"
+    if model_path.is_dir():
+        return str(model_path)
 
-    # re.DOTALL makes '.' match newlines inside the string content
-    return re.sub(pattern, replace_newlines, template_str, flags=re.DOTALL)
+    base = Path(__file__).parent.parent
+    cache_dir = base / "cached_files" / "models" / model / unique_tag
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
+    for name in ("config.json", "tokenizer_config.json"):
+        src = hf_hub_download(model, filename=name)
+        shutil.copy(src, cache_dir / name)
 
-def get_model_path(model_name_or_path: str, unique_tag: str) -> str:
-    """Given an indirect model name or path, pick out the exact model name"""
-    model_name_or_path = Path(model_name_or_path)
-    files_to_download = [
-        "config.json",
-        "tokenizer_config.json",
-    ]
+    return str(cache_dir)
 
-    if os.path.isdir(model_name_or_path):
-        return model_name_or_path
-    else:
-        BASE_DIR = Path(__file__).parent.parent
-        cached_model_path = (
-            BASE_DIR / "cached_files" / "models" / model_name_or_path / unique_tag
-        )
-        os.makedirs(cached_model_path, exist_ok=True)
-
-        for filename in files_to_download:
-            src = hf_hub_download(str(model_name_or_path), filename=filename)
-            dst = os.path.join(cached_model_path, filename)
-            shutil.copy(src, dst)
-        model_name_or_path = cached_model_path
-
-    return str(model_name_or_path)
