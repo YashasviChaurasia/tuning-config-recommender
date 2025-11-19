@@ -45,7 +45,7 @@ def split_static_and_dynamic(cfg: dict):
 
     for k, v in cfg.items():
         if isinstance(v, str) and (m := DYNAMIC_PATTERN.match(v)):
-            dynamic.append(f"--{k} '${{{m.group(1)}}}'")
+            dynamic.append(f"--{k} \"${{{m.group(1)}}}\"")
         else:
             static[k] = v
 
