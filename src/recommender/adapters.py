@@ -7,6 +7,7 @@ from recommender.utils.adapter_utils import (
     safe_serialize,
     write_yaml_preserving_templates,
     build_launch_command,
+    prepare_ir_for_accelerate,
 )
 
 
@@ -41,27 +42,25 @@ class FMSAdapter(VanillaAdapter):
         self.base_dir = Path(base_dir)
 
     def _to_target(self, ir, patches=None, tag=None):
-        ir = ir.to_dict()
-        target_dir = (self.base_dir / tag).resolve()
-        target_dir.mkdir(parents=True, exist_ok=True)
+        ir_dict = ir.to_dict()
+        out_dir = (self.base_dir / tag).resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
 
-        orig = ir["train_config"].pop("original_model_name_or_path", None)
+        orig = ir_dict["train_config"].pop("original_model_name_or_path", None)
         if orig:
-            ir["train_config"]["model_name_or_path"] = orig
+            ir_dict["train_config"]["model_name_or_path"] = orig
 
-        data_path = target_dir / "data_config.yaml"
-        write_yaml_preserving_templates(ir.get("data_preprocessor", {}), data_path)
+        ir_clean, dynamic = prepare_ir_for_accelerate(ir_dict)
+        data_path  = out_dir / "data_config.yaml"
+        accel_path = out_dir / "accelerate_config.yaml"
+        write_yaml_preserving_templates(ir_clean.get("data_preprocessor", {}), data_path)
+        write_yaml_preserving_templates(ir_clean.get("dist_config", {}), accel_path)
+        cmd = build_launch_command(ir_clean, data_path, accel_path, dynamic)
 
-        accel_path = target_dir / "accelerate_config.yaml"
-        write_yaml_preserving_templates(ir.get("dist_config", {}), accel_path)
-
-        launch_cmd = build_launch_command(ir, data_path, accel_path)
-
-        print(f"[FMSAdapter] Created configs under {target_dir}")
         return {
             "data_config": str(data_path),
             "accelerate_config": str(accel_path),
-            "launch_command": launch_cmd,
+            "launch_command": cmd,
         }
 
     def run(self, train_config, compute_config=None, dist_config=None, data_config=None, unique_tag=None):
