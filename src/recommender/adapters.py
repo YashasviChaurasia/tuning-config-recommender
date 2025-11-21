@@ -7,6 +7,7 @@ from recommender.utils.adapter_utils import (
     safe_serialize,
     write_yaml_preserving_templates,
     build_launch_command,
+    prepare_ir_for_accelerate,
 )
 
 
@@ -49,13 +50,14 @@ class FMSAdapter(VanillaAdapter):
         if orig:
             ir["train_config"]["model_name_or_path"] = orig
 
+        ir_clean, dynamic = prepare_ir_for_accelerate(ir)
         data_path = target_dir / "data_config.yaml"
-        write_yaml_preserving_templates(ir.get("data_preprocessor", {}), data_path)
+        write_yaml_preserving_templates(ir_clean.get("data_preprocessor", {}), data_path)
 
         accel_path = target_dir / "accelerate_config.yaml"
-        write_yaml_preserving_templates(ir.get("dist_config", {}), accel_path)
+        write_yaml_preserving_templates(ir_clean.get("dist_config", {}), accel_path)
 
-        launch_cmd = build_launch_command(ir, data_path, accel_path)
+        launch_cmd = build_launch_command(ir_clean, data_path, accel_path, dynamic)
 
         print(f"[FMSAdapter] Created configs under {target_dir}")
         return {
