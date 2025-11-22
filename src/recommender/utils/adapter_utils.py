@@ -19,19 +19,7 @@ def safe_serialize(obj):
 
 
 def write_yaml_preserving_templates(obj: Any, path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    def recurse(o):
-        if isinstance(o, dict):
-            return {
-                k: json.dumps(v) if k == "template" and isinstance(v, str) else recurse(v)
-                for k, v in o.items()
-            }
-        if isinstance(o, list):
-            return [recurse(x) for x in o]
-        return o
-
-    clean_obj = recurse(safe_serialize(obj))
+    clean_obj = safe_serialize(obj)
     with path.open("w", encoding="utf-8") as f:
         yaml.safe_dump(clean_obj, f, sort_keys=False, allow_unicode=True, width=10000)
 
@@ -41,7 +29,7 @@ def split_static_and_dynamic(cfg: dict):
 
     for k, v in cfg.items():
         if isinstance(v, str) and (m := DYNAMIC_PATTERN.match(v)):
-            dynamic.append(f"--{k} '${{{m.group(1)}}}'")
+            dynamic.append(f"--{k} \"${{{m.group(1)}}}\"")
         else:
             static[k] = v
 
@@ -78,7 +66,6 @@ def build_launch_command(
         *(dynamic_args or []),
         "-m 'tuning.sft_trainer'",
     ]
-
 
     for k, v in ir.get("train_config", {}).items():
         if v is not None and k != "training_data_path":
