@@ -1,6 +1,7 @@
 from recommender.utils.data_processing import (
     load_training_data,
     escape_newlines_in_strings,
+    pick_train_split
 )
 from recommender.utils.data_config import (
     has_any_key_containing,
@@ -8,6 +9,7 @@ from recommender.utils.data_config import (
     fetch_chat_template,
 )
 from typing import Dict
+from datasets import load_dataset
 from .actions import Action, IR, PatchLevel, PatchType, Comment
 
 
@@ -173,11 +175,14 @@ class ApplyChatFormat(ApplyDataFormat):
 
     def _is_data_in_required_format(self, dataset_path: str) -> bool:
         data = load_training_data(dataset_path)
+        dataset = load_dataset(dataset_path)
+        split = pick_train_split(dataset)
+        columns = dataset[split].column_names
         if isinstance(data, list) and len(data) > 0:
             data = data[0]
         if has_any_key_containing(data, self.CHAT_STYLE_KEYS):
             for chat_key in self.CHAT_STYLE_KEYS:
-                if chat_key in data:
+                if chat_key in columns:
                     val = data[chat_key]
                     if isinstance(val, list):
                         if all(
@@ -205,8 +210,11 @@ class ApplyChatFormat(ApplyDataFormat):
             chat_template = escape_newlines_in_strings(chat_template)
             chat_template = "{% raw %}\n  " + chat_template + "\n  {% endraw %}"
         data = load_training_data(dataset_path)
+        dataset = load_dataset(dataset_path)
+        split = pick_train_split(dataset)
+        columns = dataset[split].column_names
         for chat_key in self.CHAT_STYLE_KEYS:
-            if chat_key in data:
+            if chat_key in columns:
                 conversation_column_name = chat_key
                 break
 
@@ -227,8 +235,8 @@ class ApplyChatFormat(ApplyDataFormat):
             ],
         }
 
-    def _get_values_for_given_dataset(self, dataset: Dict):
-        return self._get_values_for_given_datapath(dataset.get("data_paths")[0])
+    def _get_values_for_given_dataset(self, dataset: Dict, model_name_or_path: str, max_seq_length: int):
+        return self._get_values_for_given_datapath(dataset.get("data_paths")[0],model_name_or_path, max_seq_length)
 
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
@@ -251,7 +259,11 @@ class ApplyChatFormat(ApplyDataFormat):
                 }
             ]
         for dataset in ir.data_preprocessor["datasets"]:
-            values_to_set = self._get_values_for_given_dataset(dataset)
+            values_to_set = self._get_values_for_given_dataset(
+                dataset,
+                ir.train_config["model_name_or_path"],
+                ir.train_config.get("max_seq_length", 2048)
+            )
             dataset["data_handlers"] = values_to_set["data_handlers"]
             # TODO: all datasets can only use one chat template
             # so we should check if we find a different chat template
