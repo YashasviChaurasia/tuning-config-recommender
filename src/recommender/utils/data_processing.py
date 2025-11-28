@@ -1,13 +1,14 @@
-import os
-import re
 import csv
 import json
-import pandas as pd
-from loguru import logger
-from pathlib import Path
+import os
+import re
 import shutil
+from pathlib import Path
+
+import pandas as pd
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
+from loguru import logger
 
 
 def extract_data_from_general_file(file_path) -> dict:
@@ -15,13 +16,13 @@ def extract_data_from_general_file(file_path) -> dict:
     ext = os.path.splitext(file_path)[-1].lower()
 
     if ext == ".json":
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
     elif ext == ".jsonl":
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = [json.loads(line) for line in f]
     elif ext == ".csv":
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             data = list(reader)
     elif ext == ".parquet":
@@ -68,11 +69,12 @@ def load_training_data(training_data_path: str) -> dict:
     elif os.path.isdir(training_data_path) or maybe_is_a_hf_dataset_id:
         try:
             dataset = load_dataset(training_data_path)
-            split=pick_train_split(dataset)
+            split = pick_train_split(dataset)
             data = [dict(example) for example in dataset[split]]
             return data
         except Exception as e:
-            raise ValueError(f"Error loading dataset from folder or hf id: {e}")
+            raise ValueError(f"Error loading dataset from folder or hf id: {e}") from e
+
     raise ValueError(
         f"Failed to find a way to load the provided dataset path {training_data_path}"
     )
@@ -82,10 +84,10 @@ def load_model_file_from_hf(model_name_or_path: str, file_name: str) -> dict:
     """Load contens of a specific file of a model. Supports both the local file system and HF hub."""
     try:
         config_path = hf_hub_download(repo_id=model_name_or_path, filename=file_name)
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
 
-    except Exception as e:
+    except Exception:
         return {}
 
     return config

@@ -1,15 +1,14 @@
-from recommender.utils.data_processing import (
-    load_training_data,
-    escape_newlines_in_strings,
-    pick_train_split
-)
 from recommender.utils.data_config import (
-    has_any_key_containing,
     determine_input_and_response_text,
     fetch_chat_template,
+    has_any_key_containing,
 )
-from typing import Dict
-from .actions import Action, IR, PatchLevel, PatchType, Comment
+from recommender.utils.data_processing import (
+    escape_newlines_in_strings,
+    load_training_data,
+)
+
+from .actions import IR, Action, Comment, PatchLevel, PatchType
 
 
 class ApplyDataFormat(Action):
@@ -59,7 +58,6 @@ class ApplyDataFormat(Action):
 
 
 class ApplyQAFormat(ApplyDataFormat):
-
     def _is_data_in_required_format(self, dataset_path: str) -> bool:
         data = load_training_data(dataset_path)
         if isinstance(data, list) and len(data) > 0:
@@ -90,7 +88,7 @@ class ApplyQAFormat(ApplyDataFormat):
             return True
         return False
 
-    def _is_dataset_in_required_format(self, dataset: Dict) -> bool:
+    def _is_dataset_in_required_format(self, dataset: dict) -> bool:
         # TODO: This can turn out to be an time-intensive operation
         # we should think if we want to do this.
         # ideally should iterate over each datapath using _is_data_in_required_format
@@ -100,10 +98,10 @@ class ApplyQAFormat(ApplyDataFormat):
         # TODO: Actions should made aware of the existing user changes
         # right now they work in replace-everything-first approach
         input_text, response_text = determine_input_and_response_text(dataset_path)
-        template = f"\"### Input: {{{{ {input_text} }}}}\\n\\n### Response: {{{{ {response_text} }}}}\""
+        template = f'"### Input: {{{{ {input_text} }}}}\\n\\n### Response: {{{{ {response_text} }}}}"'
         formatted_text_column_name = "formatted_qa_data"
         dataset_text_field = "formatted_qa_data"
-        response_template = f"\\n### Response:"
+        response_template = "\\n### Response:"
         return {
             "template": template,
             "input_text": input_text,
@@ -126,7 +124,7 @@ class ApplyQAFormat(ApplyDataFormat):
             ],
         }
 
-    def _get_values_for_given_dataset(self, dataset: Dict):
+    def _get_values_for_given_dataset(self, dataset: dict):
         return self._get_values_for_given_datapath(dataset.get("data_paths")[0])
 
     def apply(self, ir: IR) -> IR:
@@ -144,7 +142,7 @@ class ApplyQAFormat(ApplyDataFormat):
             }
             ir.data_preprocessor["datasets"] = [
                 {
-                    "name": f"dataset_from_inputs",
+                    "name": "dataset_from_inputs",
                     "data_paths": [ir.train_config.get("training_data_path")],
                     "data_handlers": {},
                 }
@@ -189,7 +187,7 @@ class ApplyChatFormat(ApplyDataFormat):
                             return True
         return False
 
-    def _is_dataset_in_required_format(self, dataset: Dict) -> bool:
+    def _is_dataset_in_required_format(self, dataset: dict) -> bool:
         # TODO: This can turn out to be an time-intensive operation
         # we should think if we want to do this.
         # ideally should iterate over each datapath using _is_data_in_required_format
@@ -207,7 +205,7 @@ class ApplyChatFormat(ApplyDataFormat):
             chat_template = escape_newlines_in_strings(chat_template)
             chat_template = "{% raw %}\n  " + chat_template + "\n  {% endraw %}"
         data = load_training_data(dataset_path)
-        columns =data[0].keys()
+        columns = data[0].keys()
         for chat_key in self.CHAT_STYLE_KEYS:
             if chat_key in columns:
                 conversation_column_name = chat_key
@@ -230,8 +228,12 @@ class ApplyChatFormat(ApplyDataFormat):
             ],
         }
 
-    def _get_values_for_given_dataset(self, dataset: Dict, model_name_or_path: str, max_seq_length: int):
-        return self._get_values_for_given_datapath(dataset.get("data_paths")[0],model_name_or_path, max_seq_length)
+    def _get_values_for_given_dataset(
+        self, dataset: dict, model_name_or_path: str, max_seq_length: int
+    ):
+        return self._get_values_for_given_datapath(
+            dataset.get("data_paths")[0], model_name_or_path, max_seq_length
+        )
 
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
@@ -248,7 +250,7 @@ class ApplyChatFormat(ApplyDataFormat):
             }
             ir.data_preprocessor["datasets"] = [
                 {
-                    "name": f"dataset_from_inputs",
+                    "name": "dataset_from_inputs",
                     "data_paths": [ir.train_config.get("training_data_path")],
                     "data_handlers": {},
                 }
@@ -257,7 +259,7 @@ class ApplyChatFormat(ApplyDataFormat):
             values_to_set = self._get_values_for_given_dataset(
                 dataset,
                 ir.train_config["model_name_or_path"],
-                ir.train_config.get("max_seq_length", 2048)
+                ir.train_config.get("max_seq_length", 2048),
             )
             dataset["data_handlers"] = values_to_set["data_handlers"]
             # TODO: all datasets can only use one chat template

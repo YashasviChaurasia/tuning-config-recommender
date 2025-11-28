@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
 from enum import StrEnum, auto
+from typing import Any
+
 import jsonpatch
 from loguru import logger
 
@@ -32,14 +33,14 @@ class Comment:
 
 @dataclass
 class IR:
-    train_config: Optional[Dict] = field(default_factory=dict)
-    compute_config: Optional[Dict] = field(default_factory=dict)
-    dist_config: Optional[Dict] = field(default_factory=dict)
-    data_preprocessor: Optional[Dict] = field(default_factory=dict)
+    train_config: dict | None = field(default_factory=dict)
+    compute_config: dict | None = field(default_factory=dict)
+    dist_config: dict | None = field(default_factory=dict)
+    data_preprocessor: dict | None = field(default_factory=dict)
     # For json merge patch metadata
     level: Any = None
     type: Any = None
-    effect: List = None
+    effect: list = None
     comment: str = None
 
     def __post_init__(self):
@@ -75,8 +76,8 @@ class Action:
     depends_on_dist_config: bool = False
     depends_on_data_preprocessor: bool = False
     depends_on_dataset: bool = False
-    json_merge_patches: List[IR] = []
-    json_patches_and_comment_wrt_source: List[Dict] = []
+    json_merge_patches: list[IR] = []
+    json_patches_and_comment_wrt_source: list[dict] = []
 
     def heuristic_skip(self, ir: IR) -> bool:
         """Given the existing input, this function does some heuristic analysis

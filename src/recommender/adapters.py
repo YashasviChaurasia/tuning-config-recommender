@@ -1,14 +1,14 @@
-from recommender.actions import IR
-from recommender.utils.data_processing import get_model_path
-from recommender.rule_engine import RuleEngine
 from copy import deepcopy
 from pathlib import Path
+
+from recommender.actions import IR
+from recommender.rule_engine import RuleEngine
 from recommender.utils.adapter_utils import (
-    safe_serialize,
-    write_yaml_preserving_templates,
     build_launch_command,
     prepare_ir_for_accelerate,
+    write_yaml_preserving_templates,
 )
+from recommender.utils.data_processing import get_model_path
 
 
 class Adapter:
@@ -23,7 +23,9 @@ class VanillaAdapter(Adapter):
         re = RuleEngine()
         re.register_all_inbuilt_actions()
         model_name_or_path = train_config["model_name_or_path"]
-        local_model_name_or_path = get_model_path(model_name_or_path, unique_tag=unique_tag)
+        local_model_name_or_path = get_model_path(
+            model_name_or_path, unique_tag=unique_tag
+        )
         train_config["model_name_or_path"] = local_model_name_or_path
         train_config["original_model_name_or_path"] = model_name_or_path
 
@@ -52,7 +54,9 @@ class FMSAdapter(VanillaAdapter):
 
         ir_clean, dynamic_args = prepare_ir_for_accelerate(ir)
         data_path = target_dir / "data_config.yaml"
-        write_yaml_preserving_templates(ir_clean.get("data_preprocessor", {}), data_path)
+        write_yaml_preserving_templates(
+            ir_clean.get("data_preprocessor", {}), data_path
+        )
 
         accel_path = target_dir / "accelerate_config.yaml"
         write_yaml_preserving_templates(ir_clean.get("dist_config", {}), accel_path)
@@ -66,7 +70,14 @@ class FMSAdapter(VanillaAdapter):
             "launch_command": launch_cmd,
         }
 
-    def run(self, train_config, compute_config=None, dist_config=None, data_config=None, unique_tag=None):
+    def run(
+        self,
+        train_config,
+        compute_config=None,
+        dist_config=None,
+        data_config=None,
+        unique_tag=None,
+    ):
         ir, patches = self.execute(
             train_config,
             compute_config or {},
