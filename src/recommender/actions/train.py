@@ -1,17 +1,19 @@
-from recommender.utils.train_config import is_model_type_moe
-from recommender.utils.train_config import get_model_config
 import math
+
+from recommender.constants import (
+    DEFAULT_NUM_GPUS_PER_NODE,
+    DEFAULT_NUM_NODES,
+)
 from recommender.utils.train_config import (
+    get_model_config,
+    is_model_type_moe,
     use_kb_for_batch_size,
 )
-from .actions import IR, Action, PatchLevel, PatchType, Comment
-from recommender.constants import (
-    DEFAULT_NUM_NODES,
-    DEFAULT_NUM_GPUS_PER_NODE,
-)
+
+from .actions import IR, Action, Comment, PatchLevel, PatchType
+
 
 class ApplyDistributedTraining(Action):
-
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
             self.skip = True
@@ -19,7 +21,9 @@ class ApplyDistributedTraining(Action):
         comment = Comment()
 
         num_nodes = int(ir.compute_config.get("num_nodes", DEFAULT_NUM_NODES))
-        num_gpus_per_node = int(ir.compute_config.get("num_gpus_per_node", DEFAULT_NUM_GPUS_PER_NODE))
+        num_gpus_per_node = int(
+            ir.compute_config.get("num_gpus_per_node", DEFAULT_NUM_GPUS_PER_NODE)
+        )
         num_processes = num_nodes * num_gpus_per_node
 
         fsdp_sharding_strategy = "FULL_SHARD"
@@ -35,7 +39,7 @@ class ApplyDistributedTraining(Action):
         fsdp_state_dict_type = "FULL_STATE_DICT"
         if is_model_type_moe(ir.train_config.get("model_name_or_path")):
             fsdp_state_dict_type = "SHARDED_STATE_DICT"
-            comment.add(f"SHARDED_STATE_DICT is needed for compatibility")
+            comment.add("SHARDED_STATE_DICT is needed for compatibility")
 
         data = {
             "num_processes": num_processes,
@@ -71,7 +75,6 @@ class ApplyDistributedTraining(Action):
 
 
 class ApplyGradientCheckpointing(Action):
-
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
             self.skip = True
@@ -137,7 +140,6 @@ class ApplyLoRAConfig(Action):
 
 
 class ApplyMoEOptimization(Action):
-
     def _get_num_experts(self, model_name_or_path: str) -> int:
         config = get_model_config(model_name_or_path)
         num_local_experts = config.get("num_local_experts", None)
@@ -175,7 +177,6 @@ class ApplyMoEOptimization(Action):
 
 
 class ApplyOptimalBatchSize(Action):
-
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
             self.skip = True
@@ -248,7 +249,6 @@ class ApplyFastKernelsOptimization(Action):
 
 
 class ApplyTrainingOptimization(Action):
-
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
             self.skip = True

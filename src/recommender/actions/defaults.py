@@ -1,8 +1,7 @@
-from .actions import IR, Action, PatchLevel, PatchType, Comment
+from .actions import IR, Action, Comment, PatchLevel, PatchType
 
 
 class ApplyDefaults(Action):
-
     def apply(self, ir: IR) -> IR:
         if self.heuristic_skip(ir) or self.skip:
             self.skip = True

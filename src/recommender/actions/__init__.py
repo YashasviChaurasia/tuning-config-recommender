@@ -1,16 +1,16 @@
+from .actions import IR, Action
+from .compute import ApplyComputeConfig
+from .data import ApplyChatFormat, ApplyQAFormat
 from .defaults import ApplyDefaults
 from .train import (
-    ApplyTrainingOptimization,
     ApplyDistributedTraining,
     ApplyFastKernelsOptimization,
     ApplyGradientCheckpointing,
     ApplyLoRAConfig,
     ApplyMoEOptimization,
     ApplyOptimalBatchSize,
+    ApplyTrainingOptimization,
 )
-from .data import ApplyChatFormat, ApplyQAFormat
-from .compute import ApplyComputeConfig
-from .actions import Action, IR
 
 ACTIONS = [
     ApplyDefaults,

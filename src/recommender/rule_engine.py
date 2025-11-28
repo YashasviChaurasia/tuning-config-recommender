@@ -1,15 +1,16 @@
-from typing import List, Dict
-from recommender.actions import Action, IR, ACTIONS
 import os
 from copy import deepcopy
+
 from loguru import logger
 from tqdm import tqdm
+
+from recommender.actions import ACTIONS, IR, Action
 from recommender.utils import set_difference, set_issubset
 
 
 class RuleEngine:
-    actions: List[Action] = []
-    ir_pipeline: List[IR] = []
+    actions: list[Action] = []
+    ir_pipeline: list[IR] = []
 
     def __init__(self):
         pass
@@ -30,7 +31,7 @@ class RuleEngine:
     def register_all_inbuilt_actions(self):
         for action_cls in ACTIONS:
             self.register_action(action_cls())
-        logger.debug(f"All actions registered!")
+        logger.debug("All actions registered!")
 
     def _get_json_patch_from_merge_patch(
         self, json_merge_patch: IR, source_ir: IR, ir_to_patch: IR
@@ -66,7 +67,7 @@ class RuleEngine:
     def validate_and_maybe_fix_ir(self, ir: IR):
         if not os.path.exists(ir.train_config.get("model_name_or_path", None)):
             raise ValueError(
-                f"Given model_name_or_path {ir.train_config.get("model_name_or_path", "")}"
+                f"Given model_name_or_path {ir.train_config.get('model_name_or_path', '')}"
                 "is not accessible to rule engine"
             )
         if ir.train_config.get("tuning_strategy", None) not in [
@@ -76,7 +77,7 @@ class RuleEngine:
             "alora",
         ]:
             raise ValueError(
-                f"Tuning strategy {ir.train_config.get("tuning_strategy", "")} is not clear."
+                f"Tuning strategy {ir.train_config.get('tuning_strategy', '')} is not clear."
                 "Should be one of lora, full, none"
             )
         if (
@@ -98,7 +99,7 @@ class RuleEngine:
             max_iterations -= 1
         # extracting comments for json patches
         json_patches = self.ir_pipeline[0].get_json_patch(ir_to_apply)
-        final_json_patches_with_comment: List[Dict] = []
+        final_json_patches_with_comment: list[dict] = []
         _json_patches_that_have_comments = []
         for action in self.actions:
             if len(action.json_patches_and_comment_wrt_source):

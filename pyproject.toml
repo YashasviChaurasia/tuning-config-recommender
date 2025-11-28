@@ -53,3 +53,30 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format ="[%(asctime)s %(levelname)-5s][%(filename)20s:%(lineno)3s %(funcName)25s()] %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+[tool.ruff]
+line-length = 88
+fix = true
+unsafe-fixes = false
+src = ["src"]
+
+[tool.ruff.lint]
+select = [
+    "F",    # Pyflakes
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+]
+
+ignore = [
+    "E501",
+    "F401",
+    "F403",
+]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"

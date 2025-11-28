@@ -1,10 +1,12 @@
 import json
-import yaml
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
+import yaml
 
 DYNAMIC_PATTERN = re.compile(r"^\$\{([A-Za-z0-9_]+)\}$")
+
 
 def safe_serialize(obj):
     if obj is None or isinstance(obj, (str, int, float, bool)):
@@ -29,7 +31,7 @@ def split_static_and_dynamic(cfg: dict):
 
     for k, v in cfg.items():
         if isinstance(v, str) and (m := DYNAMIC_PATTERN.match(v)):
-            dynamic.append(f"--{k} \"${{{m.group(1)}}}\"")
+            dynamic.append(f'--{k} "${{{m.group(1)}}}"')
         else:
             static[k] = v
 
@@ -53,13 +55,13 @@ def prepare_ir_for_accelerate(ir: dict):
     ir["dist_config"] = static_dist
     return ir, dynamic
 
+
 def build_launch_command(
-    ir: Dict[str, Any],
+    ir: dict[str, Any],
     data_config_path: Path,
     accelerate_config_path: Path,
-    dynamic_args: List[str] = None,
+    dynamic_args: list[str] = None,
 ) -> str:
-    train = ir.get("train_config", {})
     cmd = [
         "accelerate launch",
         f"--config_file {accelerate_config_path}",

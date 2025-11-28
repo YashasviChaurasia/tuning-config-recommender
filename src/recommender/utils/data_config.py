@@ -1,19 +1,17 @@
-import os
 import json
-import yaml
+import os
 from pathlib import Path
+
+import yaml
+
 from recommender.utils.data_processing import (
-    load_training_data,
     load_model_file_from_hf,
+    load_training_data,
 )
 from recommender.utils.train_config import (
     fetch_from_knowledge_base,
     is_model_type_moe,
 )
-from pathlib import Path
-
-import os
-import json
 
 
 def get_model_for_chat_template_mapping(model_name_or_path):
@@ -24,7 +22,7 @@ def get_model_for_chat_template_mapping(model_name_or_path):
     config_path = (
         base_dir / "knowledge_base" / "default_mappings" / "chat_template_map.yaml"
     )
-    with open(config_path, "r") as file:
+    with open(config_path) as file:
         MODEL_NAME_FOR_CHAT_TEMPLATE_MAPPING = yaml.safe_load(file)
 
     for model_id, keywords in MODEL_NAME_FOR_CHAT_TEMPLATE_MAPPING.items():
@@ -42,9 +40,7 @@ def get_model_for_chat_template_mapping(model_name_or_path):
 def fetch_chat_template(model_name_or_path: str):
     """Given a model HF ID or Path, fetch the chat template (instruct model)"""
     if os.path.isdir(model_name_or_path):
-        with open(
-            f"{model_name_or_path}/tokenizer_config.json", "r", encoding="utf-8"
-        ) as f:
+        with open(f"{model_name_or_path}/tokenizer_config.json", encoding="utf-8") as f:
             config = json.load(f)
             if "chat_template" not in config:
                 model_name = "ibm-granite/" + model_name_or_path.split("/")[-2].replace(
@@ -131,6 +127,5 @@ def determine_input_and_response_text(training_data_path: str) -> dict:
 
 def has_any_key_containing(example, key_substrings):
     return any(
-        any(sub in key.lower() for sub in key_substrings)
-        for key in example.keys()
+        any(sub in key.lower() for sub in key_substrings) for key in example.keys()
     )

@@ -1,9 +1,9 @@
-import os
-import yaml
 import json
-import pandas as pd
+import os
 from pathlib import Path
-from urllib.parse import urlparse
+
+import pandas as pd
+import yaml
 
 script_dir = Path(__file__).resolve().parent
 
@@ -12,7 +12,7 @@ def is_model_type_moe(model_name_or_path: str) -> bool:
     """Checks if the granite model given is MoE"""
 
     if os.path.isdir(model_name_or_path):
-        with open(f"{model_name_or_path}/config.json", "r", encoding="utf-8") as f:
+        with open(f"{model_name_or_path}/config.json", encoding="utf-8") as f:
             config = json.load(f)
 
     moe_tags = ["granitemoe", ""]
@@ -31,7 +31,7 @@ def is_model_type_moe(model_name_or_path: str) -> bool:
     return False
 
 
-def find_best_row(df, target_length, default_value={}):
+def find_best_row(df, target_length, default_value=None):
     # Step 1: Exact match
     exact_match = df[df["model_max_length"] == target_length]
     if not exact_match.empty:
@@ -62,7 +62,7 @@ def use_kb_for_batch_size(user_input: dict):
 
     try:
         model_name_or_path = model_name_or_path.split("/")[-2]
-    except:
+    except Exception:
         pass
 
     filtered = df[
@@ -117,15 +117,15 @@ def fetch_from_knowledge_base(model_name_or_path: str, config_folder) -> dict:
         project_root / directory_to_load / config_folder / "train_args.yaml"
     )
     try:
-        with open(train_args_file_path, "r") as file:
+        with open(train_args_file_path) as file:
             data = yaml.safe_load(file)
-    except:
+    except Exception:
         data = {}
 
     return data, found
 
 
 def get_model_config(model_name_or_path: str):
-    with open(f"{model_name_or_path}/config.json", "r", encoding="utf-8") as f:
+    with open(f"{model_name_or_path}/config.json", encoding="utf-8") as f:
         config = json.load(f)
     return config

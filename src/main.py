@@ -1,4 +1,4 @@
-from recommender.adapters import VanillaAdapter, FMSAdapter
+from recommender.adapters import FMSAdapter, VanillaAdapter
 
 if __name__ == "__main__":
     print("\n### Vanilla Adapter ###\n")
@@ -29,4 +29,3 @@ if __name__ == "__main__":
         unique_tag="gpq12df-fms",
     )
     print(result["launch_command"])
-
