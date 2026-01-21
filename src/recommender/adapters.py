@@ -1,6 +1,8 @@
 from copy import deepcopy
 from pathlib import Path
-from typing import List
+
+from loguru import logger
+
 from recommender.actions import IR
 from recommender.rule_engine import RuleEngine
 from recommender.utils.adapter_utils import (
@@ -9,7 +11,6 @@ from recommender.utils.adapter_utils import (
     write_yaml_preserving_templates,
 )
 from recommender.utils.data_processing import get_model_path
-from loguru import logger
 
 
 class Adapter:
@@ -58,11 +59,13 @@ class VanillaAdapter(Adapter):
 
 
 class FMSAdapter(VanillaAdapter):
-    def __init__(self, base_dir: str | Path = "out/fms_final", additional_actions=[]):
+    def __init__(self, base_dir: str | Path = "out/fms_final", additional_actions=None):
         self.base_dir = Path(base_dir)
+        if not additional_actions:
+            additional_actions = []
         self.additional_actions = additional_actions
 
-    def _populate_data_config(self, data_paths: List[str]):
+    def _populate_data_config(self, data_paths: list[str]):
         # NOTE: The assumption is all the data paths are uniform
         # type as in they all are either chat or QA.
         return {
@@ -95,7 +98,7 @@ class FMSAdapter(VanillaAdapter):
             #     "qa_data": "",
             # }
             data_paths = []
-            for name, path in paths.items():
+            for _, path in paths.items():
                 if "_data" in path:
                     data_paths.append(path)
             data_config = self._populate_data_config(data_paths)

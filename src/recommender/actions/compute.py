@@ -3,10 +3,10 @@ from loguru import logger
 from .actions import IR, Action, Comment, PatchLevel, PatchType
 
 try:
+    from autoconf.utils.config_mapper import map_valid_model_name
     from fm_training_estimator.regressor.min_gpu.recommender import (
         MinGpuRecommenderCaller,
     )
-    from autoconf.utils.config_mapper import map_valid_model_name
 
     skip_autoconf = False
 except ImportError:
@@ -21,8 +21,8 @@ class ApplyComputeConfig(Action):
 
     def __init__(self):
         if not skip_autoconf:
-            if self._recommender == None:
-                logger.debug(f"No recommender instance set.. creating one")
+            if self._recommender is None:
+                logger.debug("No recommender instance set.. creating one")
                 self._recommender = MinGpuRecommenderCaller()
 
     def heuristic_skip(self, ir):

@@ -1,6 +1,7 @@
-from recommender.adapters import FMSAdapter, VanillaAdapter
-import sys
 import importlib
+import sys
+
+from recommender.adapters import FMSAdapter, VanillaAdapter
 
 user_folder = sys.argv[1]
 sys.path.insert(0, user_folder)

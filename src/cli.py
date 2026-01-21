@@ -1,12 +1,14 @@
 import argparse
-import sys
-import pkgutil
 import importlib
+import pkgutil
+import sys
 from pathlib import Path
-from recommender.adapters import FMSAdapter
-from recommender.actions import Action
-from loguru import logger
+
 import yaml
+from loguru import logger
+
+from recommender.actions import Action
+from recommender.adapters import FMSAdapter
 
 
 def load_actions_from_folder(folder_path):
