@@ -71,26 +71,26 @@ class RuleEngine:
         return running_ir
 
     def validate_and_maybe_fix_ir(self, ir: IR):
-        if not os.path.exists(ir.train_config.get("model_name_or_path", None)):
+        if not os.path.exists(ir.tuning_config.get("model_name_or_path", None)):
             raise ValueError(
-                f"Given model_name_or_path {ir.train_config.get('model_name_or_path', '')}"
+                f"Given model_name_or_path {ir.tuning_config.get('model_name_or_path', '')}"
                 "is not accessible to rule engine"
             )
-        if ir.train_config.get("tuning_strategy", None) not in [
+        if ir.tuning_config.get("tuning_strategy", None) not in [
             "lora",
             "full",
             "none",
             "alora",
         ]:
             raise ValueError(
-                f"Tuning strategy {ir.train_config.get('tuning_strategy', '')} is not clear."
+                f"Tuning strategy {ir.tuning_config.get('tuning_strategy', '')} is not clear."
                 "Should be one of lora, full, none"
             )
         if (
-            ir.train_config.get("training_data_path", None)
-            and len(ir.data_preprocessor.get("datasets", [])) > 0
+            ir.tuning_config.get("training_data_path", None)
+            and len(ir.tuning_data_config.get("datasets", [])) > 0
         ):
-            ir.train_config.pop("training_data_path")
+            ir.tuning_config.pop("training_data_path")
         logger.debug(f"IR {ir} is valid!")
         return ir
 

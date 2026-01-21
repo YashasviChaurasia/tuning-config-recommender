@@ -11,7 +11,7 @@ class Custom_ApplyDefaults2(Action):
             self.skip = True
             return
         return_ir = IR(
-            train_config={
+            tuning_config={
                 "logging_steps": 1,
                 "logging_strategy": "steps",
                 "dataloader_drop_last": True,

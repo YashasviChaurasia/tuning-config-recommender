@@ -4,7 +4,7 @@ from tuning_config_recommender.constants import (
     DEFAULT_NUM_GPUS_PER_NODE,
     DEFAULT_NUM_NODES,
 )
-from tuning_config_recommender.utils.train_config import (
+from tuning_config_recommender.utils.tuning_config import (
     get_model_config,
     is_model_type_moe,
     use_kb_for_batch_size,
@@ -37,7 +37,7 @@ class ApplyDistributedTraining(Action):
                 )
 
         fsdp_state_dict_type = "FULL_STATE_DICT"
-        if is_model_type_moe(ir.train_config.get("model_name_or_path")):
+        if is_model_type_moe(ir.tuning_config.get("model_name_or_path")):
             fsdp_state_dict_type = "SHARDED_STATE_DICT"
             comment.add("SHARDED_STATE_DICT is needed for compatibility")
 
@@ -64,7 +64,7 @@ class ApplyDistributedTraining(Action):
             "main_process_port": "${MASTER_PORT}",
         }
         ir = IR(
-            dist_config=data,
+            accelerate_config=data,
             type=PatchType.COMPATIBILITY,
             level=PatchLevel.MANDATORY,
             comment=comment,
@@ -81,7 +81,7 @@ class ApplyGradientCheckpointing(Action):
             return
         gradient_checkpointing = True
         gradient_checkpointing_kwargs = '{"use_reentrant": true}'
-        tuning_strategy = ir.train_config.get("tuning_strategy")
+        tuning_strategy = ir.tuning_config.get("tuning_strategy")
         comment = Comment(
             "gradient checkpointing provides memory savings which can translate to throughput by increasing the batchsize"
         )
@@ -90,7 +90,7 @@ class ApplyGradientCheckpointing(Action):
             gradient_checkpointing_kwargs = None
             comment.add("Gradient checkpointing is not supported for ALoRA.")
         ir = IR(
-            train_config={
+            tuning_config={
                 "gradient_checkpointing": gradient_checkpointing,
                 "gradient_checkpointing_kwargs": gradient_checkpointing_kwargs,
             },
@@ -106,8 +106,8 @@ class ApplyGradientCheckpointing(Action):
 class ApplyLoRAConfig(Action):
     def heuristic_skip(self, ir):
         if (
-            ir.train_config.get("tuning_strategy") == "lora"
-            or ir.train_config.get("peft_method", None) == "lora"
+            ir.tuning_config.get("tuning_strategy") == "lora"
+            or ir.tuning_config.get("peft_method", None) == "lora"
         ):
             return False
         return True
@@ -129,7 +129,7 @@ class ApplyLoRAConfig(Action):
             "modules_to_save": ["lm_head", "embed_token"],
         }
         ir = IR(
-            train_config=data,
+            tuning_config=data,
             type=PatchType.COMPATIBILITY,
             level=PatchLevel.MANDATORY,
             comment=Comment("LoRA config is added since you are using LoRA training."),
@@ -147,7 +147,7 @@ class ApplyMoEOptimization(Action):
         return num_local_experts or num_experts
 
     def heuristic_skip(self, ir):
-        if self._get_num_experts(ir.train_config.get("model_name_or_path")):
+        if self._get_num_experts(ir.tuning_config.get("model_name_or_path")):
             return False
         return True
 
@@ -159,14 +159,14 @@ class ApplyMoEOptimization(Action):
         # data variables
         fast_moe = True
 
-        num_experts = self._get_num_experts(ir.train_config.get("model_name_or_path"))
+        num_experts = self._get_num_experts(ir.tuning_config.get("model_name_or_path"))
         num_nodes = ir.compute_config.get("num_nodes", 1)
         num_gpus_per_node = ir.compute_config.get("num_gpus_per_node", None)
         if num_gpus_per_node:
             fast_moe = math.gcd(num_experts, num_gpus_per_node * num_nodes)
 
         return_ir = IR(
-            train_config={"fast_moe": fast_moe},
+            tuning_config={"fast_moe": fast_moe},
             type=PatchType.SYSTEM_PERFORMANCE,
             level=PatchLevel.SUGGESTION,
             comment=Comment("fast_moe option gives 1.5 to 4X speedup."),
@@ -183,13 +183,13 @@ class ApplyOptimalBatchSize(Action):
             return
 
         input_dict = {
-            "model_name_or_path": ir.train_config["model_name_or_path"],
-            "tuning_strategy": ir.train_config["tuning_strategy"],
-            "max_seq_length": ir.train_config.get("max_seq_length", 2048),
+            "model_name_or_path": ir.tuning_config["model_name_or_path"],
+            "tuning_strategy": ir.tuning_config["tuning_strategy"],
+            "max_seq_length": ir.tuning_config.get("max_seq_length", 2048),
         }
         output_dict = use_kb_for_batch_size(input_dict)
         return_ir = IR(
-            train_config={
+            tuning_config={
                 "per_device_train_batch_size": output_dict.get(
                     "per_device_train_batch_size", 1
                 ),
@@ -224,7 +224,7 @@ class ApplyFastKernelsOptimization(Action):
     ]
 
     def heuristic_skip(self, ir):
-        config = get_model_config(ir.train_config["model_name_or_path"])
+        config = get_model_config(ir.tuning_config["model_name_or_path"])
         if config.get("architectures", [""])[0] in self.supported_model_archs:
             return False
         return True
@@ -236,7 +236,7 @@ class ApplyFastKernelsOptimization(Action):
         # TODO: fast kernels are not supported for some optimizer classes
         # we should either edit this or skip this optimization
         return_ir = IR(
-            train_config={"fast_kernels": ["True", "True", "True"]},
+            tuning_config={"fast_kernels": ["True", "True", "True"]},
             type=PatchType.SYSTEM_PERFORMANCE,
             level=PatchLevel.SUGGESTION,
             comment=Comment(
@@ -256,7 +256,7 @@ class ApplyTrainingOptimization(Action):
         # TODO: fast kernels are not supported for some optimizer classes
         # we should either edit this or skip this optimization
         return_ir = IR(
-            train_config={"padding_free": "huggingface", "use_flash_attn": True},
+            tuning_config={"padding_free": "huggingface", "use_flash_attn": True},
             type=PatchType.SYSTEM_PERFORMANCE,
             level=PatchLevel.SUGGESTION,
             comment=Comment(

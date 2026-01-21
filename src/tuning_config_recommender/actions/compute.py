@@ -71,7 +71,7 @@ class ApplyComputeConfig(Action):
         )
         # invoke min_gpu_recommender
 
-        r_model_name = ir.train_config.get("model_name_or_path", None)
+        r_model_name = ir.tuning_config.get("model_name_or_path", None)
         if not r_model_name:
             raise Exception(f"model name was not populated in the representation {ir}")
 
@@ -79,7 +79,7 @@ class ApplyComputeConfig(Action):
         r_model_name = self._infer_model_name(r_model_name)
 
         # Check if tuning method is enabled, if not go for full
-        r_method = ir.train_config.get("tuning_strategy", "full")
+        r_method = ir.tuning_config.get("tuning_strategy", "full")
 
         # set GPU model - for now we assume it's for Vela
         # TODO: obtain some information from the environment to determine which
@@ -90,8 +90,8 @@ class ApplyComputeConfig(Action):
         # while the recommender model uses batch size across gpus.
         # Current solution - test every #GPU in 1,2,4,8 and pick the smallest one that we get
         # recommendation for
-        r_max_seq_length = ir.train_config.get("max_seq_length", 2048)
-        r_batch_size = ir.train_config.get("per_device_batch_size", 1)
+        r_max_seq_length = ir.tuning_config.get("max_seq_length", 2048)
+        r_batch_size = ir.tuning_config.get("per_device_batch_size", 1)
 
         for r_num_gpu in [1, 2, 4, 8]:
             configuration = {

@@ -8,7 +8,7 @@ from tuning_config_recommender.utils.data_processing import (
     load_model_file_from_hf,
     load_training_data,
 )
-from tuning_config_recommender.utils.train_config import (
+from tuning_config_recommender.utils.tuning_config import (
     fetch_from_knowledge_base,
 )
 

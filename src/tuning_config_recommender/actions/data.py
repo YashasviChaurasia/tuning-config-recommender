@@ -27,11 +27,11 @@ class ApplyDataFormat(Action):
         return any(field in data[0] for field in tokenized_fields)
 
     def heuristic_skip(self, ir):
-        if ir.train_config.get("training_data_path", None) or ir.data_preprocessor.get(
-            "datasets", None
-        ):
-            if ir.data_preprocessor.get("datasets", None):
-                for dataset in ir.data_preprocessor["datasets"]:
+        if ir.tuning_config.get(
+            "training_data_path", None
+        ) or ir.tuning_data_config.get("datasets", None):
+            if ir.tuning_data_config.get("datasets", None):
+                for dataset in ir.tuning_data_config["datasets"]:
                     if not len(dataset.get("data_paths", [])):
                         # TODO: instead of skipping
                         # we should return IR with type USER_INTERVENTION
@@ -44,9 +44,9 @@ class ApplyDataFormat(Action):
                             # while all paths are checked in action.apply
                             # implementation
                             return False
-            if ir.train_config.get("training_data_path", None):
+            if ir.tuning_config.get("training_data_path", None):
                 return not self._is_data_in_required_format(
-                    ir.train_config.get("training_data_path", None)
+                    ir.tuning_config.get("training_data_path", None)
                 )
         return True
 
@@ -134,24 +134,24 @@ class ApplyQAFormat(ApplyDataFormat):
         # TODO: Actions should made aware of the existing user changes
         # right now they work in replace-everything-first approach
 
-        if ir.train_config.get("training_data_path", None):
-            ir.data_preprocessor["dataprocessor"] = {
+        if ir.tuning_config.get("training_data_path", None):
+            ir.tuning_data_config["dataprocessor"] = {
                 "type": "default",
                 "streaming": False,
             }
-            ir.data_preprocessor["datasets"] = [
+            ir.tuning_data_config["datasets"] = [
                 {
                     "name": "dataset_from_inputs",
-                    "data_paths": [ir.train_config.get("training_data_path")],
+                    "data_paths": [ir.tuning_config.get("training_data_path")],
                     "data_handlers": {},
                 }
             ]
 
-        for dataset in ir.data_preprocessor["datasets"]:
+        for dataset in ir.tuning_data_config["datasets"]:
             if not self._is_data_in_required_format(dataset["data_paths"][0]):
                 continue
             values_to_set = self._get_values_for_given_dataset(dataset)
-            ir.train_config.update(
+            ir.tuning_config.update(
                 {
                     "dataset_text_field": values_to_set["dataset_text_field"],
                     "response_template": values_to_set["response_template"],
@@ -244,31 +244,31 @@ class ApplyChatFormat(ApplyDataFormat):
         # TODO: Actions should made aware of the existing user changes
         # right now they work in replace-everything-first approach
 
-        if ir.train_config.get("training_data_path", None):
-            ir.data_preprocessor["dataprocessor"] = {
+        if ir.tuning_config.get("training_data_path", None):
+            ir.tuning_data_config["dataprocessor"] = {
                 "type": "default",
                 "streaming": False,
             }
-            ir.data_preprocessor["datasets"] = [
+            ir.tuning_data_config["datasets"] = [
                 {
                     "name": "dataset_from_inputs",
-                    "data_paths": [ir.train_config.get("training_data_path")],
+                    "data_paths": [ir.tuning_config.get("training_data_path")],
                     "data_handlers": {},
                 }
             ]
-        for dataset in ir.data_preprocessor["datasets"]:
+        for dataset in ir.tuning_data_config["datasets"]:
             if not self._is_data_in_required_format(dataset["data_paths"][0]):
                 continue
             values_to_set = self._get_values_for_given_dataset(
                 dataset,
-                ir.train_config["model_name_or_path"],
-                ir.train_config.get("max_seq_length", 2048),
+                ir.tuning_config["model_name_or_path"],
+                ir.tuning_config.get("max_seq_length", 2048),
             )
             dataset["data_handlers"] = values_to_set["data_handlers"]
             # TODO: all datasets can only use one chat template
             # so we should check if we find a different chat template
             # return it as user_intervention
-            ir.data_preprocessor["chat_template"] = values_to_set["chat_template"]
+            ir.tuning_data_config["chat_template"] = values_to_set["chat_template"]
         ir.comment = Comment(
             "This data config is used for formatting chat datasets for training"
         )

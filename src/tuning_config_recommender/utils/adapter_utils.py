@@ -51,8 +51,8 @@ def fmt_cli_value(v):
 
 
 def prepare_ir_for_accelerate(ir: dict):
-    static_dist, dynamic = split_static_and_dynamic(ir.get("dist_config", {}))
-    ir["dist_config"] = static_dist
+    static_dist, dynamic = split_static_and_dynamic(ir.get("accelerate_config", {}))
+    ir["accelerate_config"] = static_dist
     return ir, dynamic
 
 
@@ -69,7 +69,7 @@ def build_launch_command(
         "-m 'tuning.sft_trainer'",
     ]
 
-    for k, v in ir.get("train_config", {}).items():
+    for k, v in ir.get("tuning_config", {}).items():
         if v is not None and k != "training_data_path":
             cmd.append(f"--{k} {fmt_cli_value(v)}")
 

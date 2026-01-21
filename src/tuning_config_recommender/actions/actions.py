@@ -33,10 +33,10 @@ class Comment:
 
 @dataclass
 class IR:
-    train_config: dict | None = field(default_factory=dict)
+    tuning_config: dict | None = field(default_factory=dict)
     compute_config: dict | None = field(default_factory=dict)
-    dist_config: dict | None = field(default_factory=dict)
-    data_preprocessor: dict | None = field(default_factory=dict)
+    accelerate_config: dict | None = field(default_factory=dict)
+    tuning_data_config: dict | None = field(default_factory=dict)
     # For json merge patch metadata
     level: Any = None
     type: Any = None
@@ -49,10 +49,10 @@ class IR:
 
     def update(self, json_merge_patch):
         data_keys = [
-            "train_config",
+            "tuning_config",
             "compute_config",
-            "dist_config",
-            "data_preprocessor",
+            "accelerate_config",
+            "tuning_data_config",
         ]
         for key in data_keys:
             if key in json_merge_patch.__dict__ and json_merge_patch.__dict__[key]:
@@ -71,10 +71,10 @@ class IR:
 
 class Action:
     skip: bool = False
-    depends_on_train_config: bool = False
+    depends_on_tuning_config: bool = False
     depends_on_compute_config: bool = False
-    depends_on_dist_config: bool = False
-    depends_on_data_preprocessor: bool = False
+    depends_on_accelerate_config: bool = False
+    depends_on_tuning_data_config: bool = False
     depends_on_dataset: bool = False
     json_merge_patches: list[IR] = []
     json_patches_and_comment_wrt_source: list[dict] = []

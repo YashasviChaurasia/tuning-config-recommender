@@ -24,6 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 async def delete_files(file_paths: list[str]) -> None:
     await asyncio.sleep(600)
     for file_path in file_paths:
@@ -33,12 +34,14 @@ async def delete_files(file_paths: list[str]) -> None:
         except Exception as e:
             logger.error(f"Failed to delete file {file_path}: {e}")
 
+
 class RecommendationsRequest(BaseModel):
     tuning_config: Optional[dict] = None
     tuning_data_config: Optional[dict] = None
     compute_config: Optional[dict] = None
     accelerate_config: Optional[dict] = None
     skip_estimator: Optional[bool] = False
+
 
 def generate_unique_stamps():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
@@ -59,37 +62,21 @@ async def recommend(
         base_dir = Path(__file__).parent
         output_dir = base_dir / "outputs" / generate_unique_stamps()
 
-        fms_adapter = FMSAdapter(
-            base_dir=output_dir, additional_actions=[]
-        )
+        fms_adapter = FMSAdapter(base_dir=output_dir, additional_actions=[])
 
-        fms_adapter.execute(
-            train_config=req.tuning_config,
+        response = fms_adapter.execute(
+            tuning_config=req.tuning_config,
             compute_config=req.compute_config,
-            dist_config=req.accelerate_config,
+            accelerate_config=req.accelerate_config,
             data_config=req.tuning_data_config,
             unique_tag="",
             paths={},
             skip_estimator=req.skip_estimator,
         )
-        response = {
-            "tuning_config": yaml.safe_load(str(output_dir / "tuning_config.yaml")),
-            "tuning_data_config": yaml.safe_load(str(output_dir / "data_config.yaml")),
-            "compute_config": yaml.safe_load(str(output_dir / "compute_config.yaml")),
-            "accelerate_config": yaml.safe_load(str(output_dir / "accelerate_config.yaml")),
-            "paths": {
-            "tuning_config": output_dir / "tuning_config.yaml",
-            "tuning_data_config": output_dir / "data_config.yaml",
-            "compute_config": output_dir / "compute_config.yaml",
-            "accelerate_config": output_dir / "accelerate_config.yaml",
-            }
-        }
-        paths_to_delete = [
-            output_dir / "tuning_config.yaml",
-            output_dir / "data_config.yaml",
-            output_dir / "compute_config.yaml",
-            output_dir / "accelerate_config.yaml"
-        ]
+        response.pop("patches")
+        for _, path in response["paths"].items():
+            paths_to_delete.append(path)
+
         background_tasks.add_task(delete_files, paths_to_delete)
         return response
     except Exception as e:

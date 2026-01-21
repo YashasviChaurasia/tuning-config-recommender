@@ -87,4 +87,3 @@ def query_kb(model_name: str, section: str):
             return row["payload"], row["model_pattern"] != "*"
 
     return {}, False
-

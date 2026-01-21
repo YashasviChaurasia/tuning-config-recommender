@@ -9,6 +9,7 @@ from loguru import logger
 
 from tuning_config_recommender.actions import Action
 from tuning_config_recommender.adapters import FMSAdapter
+import json
 
 
 def load_actions_from_folder(folder_path):
@@ -82,15 +83,22 @@ def main():
     )
 
     result = fms_adapter.execute(
-        train_config=yaml.safe_load(open(args.tuning_config)),
+        tuning_config=yaml.safe_load(open(args.tuning_config)),
         compute_config=yaml.safe_load(open(args.compute_config)),
-        dist_config=yaml.safe_load(open(args.accelerate_config)),
+        accelerate_config=yaml.safe_load(open(args.accelerate_config)),
         data_config=yaml.safe_load(open(args.tuning_data_config)),
         unique_tag="",
         paths={},
         skip_estimator=args.skip_estimator,
     )
-    print(result)
+    print(result["patches"])
+    json.dump(
+        result["serializable_patches"],
+        open(str(Path(args.output_dir) / "stdout.json"), "w"),
+    )
+    print(
+        f"Available at {args.output_dir} and parsable stdout at {Path(args.output_dir) / 'stdout.json'}"
+    )
 
 
 if __name__ == "__main__":
