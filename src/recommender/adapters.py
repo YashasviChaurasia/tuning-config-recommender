@@ -11,6 +11,7 @@ from recommender.utils.adapter_utils import (
 from recommender.utils.data_processing import get_model_path
 from loguru import logger
 
+
 class Adapter:
     def execute(self):
         pass
@@ -18,7 +19,13 @@ class Adapter:
 
 class VanillaAdapter(Adapter):
     def execute(
-        self, train_config, compute_config, dist_config, data_config, unique_tag, skip_estimator=None
+        self,
+        train_config,
+        compute_config,
+        dist_config,
+        data_config,
+        unique_tag,
+        skip_estimator=None,
     ):
         re = RuleEngine()
         re.register_all_inbuilt_actions()
@@ -73,7 +80,14 @@ class FMSAdapter(VanillaAdapter):
         }
 
     def execute(
-        self, train_config, compute_config, dist_config, data_config, unique_tag, paths, skip_estimator=None
+        self,
+        train_config,
+        compute_config,
+        dist_config,
+        data_config,
+        unique_tag,
+        paths,
+        skip_estimator=None,
     ):
         if not data_config and not train_config.get("training_data_path", None):
             # "paths" = {
@@ -86,7 +100,12 @@ class FMSAdapter(VanillaAdapter):
                     data_paths.append(path)
             data_config = self._populate_data_config(data_paths)
         ir, _ = super().execute(
-            train_config, compute_config, dist_config, data_config, unique_tag, skip_estimator
+            train_config,
+            compute_config,
+            dist_config,
+            data_config,
+            unique_tag,
+            skip_estimator,
         )
         ir = ir.to_dict()
         target_dir = (self.base_dir / unique_tag).resolve()

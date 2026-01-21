@@ -4,6 +4,7 @@ from recommender.actions import IR, Action, Comment, PatchLevel, PatchType
 ## 1. Should start with name "Custom_"
 ## 2. Should subclass from Action class
 
+
 class Custom_ApplyDefaults2(Action):
     def apply(self, ir: IR, actions_meta: list[str]) -> IR:
         if self.heuristic_skip(ir) or self.skip:

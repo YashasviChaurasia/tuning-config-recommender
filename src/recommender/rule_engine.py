@@ -17,7 +17,7 @@ class RuleEngine:
 
     def __init__(self):
         pass
-    
+
     def add_to_actions_meta(self, meta: str):
         self.actions_meta.append(meta)
 

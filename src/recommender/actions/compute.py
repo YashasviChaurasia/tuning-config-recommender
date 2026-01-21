@@ -3,8 +3,11 @@ from loguru import logger
 from .actions import IR, Action, Comment, PatchLevel, PatchType
 
 try:
-    from fm_training_estimator.regressor.min_gpu.recommender import MinGpuRecommenderCaller
+    from fm_training_estimator.regressor.min_gpu.recommender import (
+        MinGpuRecommenderCaller,
+    )
     from autoconf.utils.config_mapper import map_valid_model_name
+
     skip_autoconf = False
 except ImportError:
     skip_autoconf = True

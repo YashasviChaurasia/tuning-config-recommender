@@ -91,5 +91,5 @@ class Action:
         """
         return False
 
-    def apply(self, ir: IR, actions_meta: list[str]=[]):
+    def apply(self, ir: IR, actions_meta: list[str] = []):
         pass
