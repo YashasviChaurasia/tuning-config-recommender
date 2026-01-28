@@ -23,3 +23,4 @@ pod:
 svc: false
 # for API usage
 # svc: true
+# you may also need to create a route or ingress mapping to this svc.
