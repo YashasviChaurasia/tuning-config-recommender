@@ -83,6 +83,15 @@ class FMSAdapter(VanillaAdapter):
             ],
         }
 
+    def _resolve_data_paths_in_data_config(self, data_config):
+        import glob
+
+        for dataset in data_config.get("datasets", []):
+            dataset["data_paths"] = [
+                p for path in dataset.get("data_paths", []) for p in glob.glob(path)
+            ]
+        return data_config
+
     def execute(
         self,
         tuning_config,
@@ -103,6 +112,7 @@ class FMSAdapter(VanillaAdapter):
                 if "_data" in path:
                     data_paths.append(path)
             data_config = self._populate_data_config(data_paths)
+        data_config = self._resolve_data_paths_in_data_config(data_config)
         ir, patches = super().execute(
             tuning_config,
             compute_config,
@@ -111,6 +121,7 @@ class FMSAdapter(VanillaAdapter):
             unique_tag,
             skip_estimator,
         )
+
         ir = ir.to_dict()
         target_dir = (self.base_dir / unique_tag).resolve()
         target_dir.mkdir(parents=True, exist_ok=True)

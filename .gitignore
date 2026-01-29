@@ -8,4 +8,5 @@
 **/*.egg-info
 **/values-internal.yaml
 **/values-*.yaml
-**/values-cli-internal.yaml
+**/values-api-internal*
+**/values-cli-internal*
